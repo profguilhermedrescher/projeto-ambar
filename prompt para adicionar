@@ -1,0 +1,1 @@
+Boa, agora com esse arquivo atualizado que vc me mandou, quero que adicione uma função nova, que quando eu der 1 clique no "Ambar" lá em cima, volte para a pagina inicial, também quero que vc adicione mais itens, para não deixar nenhuma categoria vazia ou com poucos produtos
