@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Painel interno | Ambar</title>
+<style>
+:root{--ink:#263024;--muted:#687066;--green:#526b3f;--soft:#eef2e9;--line:#dfe4da;--danger:#a62f2f}*{box-sizing:border-box}body{margin:0;background:#f5f6f2;color:var(--ink);font-family:Arial,sans-serif}button,input,select{font:inherit}.top{background:#fff;border-bottom:1px solid var(--line)}.topin{max-width:1100px;margin:auto;padding:18px 20px;display:flex;justify-content:space-between;align-items:center;gap:16px}.top h1{font-size:20px;margin:0}.wrap{max-width:1100px;margin:auto;padding:24px 20px}.login{max-width:430px;margin:10vh auto;background:#fff;border:1px solid var(--line);padding:24px;border-radius:8px}.login h2{font-size:19px;margin:0 0 8px}.login p,.muted{color:var(--muted);font-size:13px;line-height:1.5}.field{display:grid;gap:6px;margin:18px 0}.field label{font-size:13px;font-weight:bold}.field input{border:1px solid var(--line);border-radius:6px;padding:11px}.btn{border:0;border-radius:6px;padding:10px 14px;background:var(--green);color:#fff;font-weight:bold;cursor:pointer}.btn.secondary{background:#fff;color:var(--green);border:1px solid var(--line)}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.list{display:grid;gap:10px}.item{background:#fff;border:1px solid var(--line);border-left:4px solid #ba3c3c;border-radius:6px;padding:16px;display:grid;grid-template-columns:1fr auto;gap:14px}.item.attending{border-left-color:#d09a2f}.item.closed{border-left-color:#72806b}.item h2{font-size:15px;margin:0 0 7px}.item p{margin:0 0 10px;line-height:1.5}.meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px}.actions{display:flex;align-items:center;gap:8px}.actions select{border:1px solid var(--line);padding:8px;border-radius:6px;background:#fff}.map{color:var(--green);font-weight:bold;font-size:13px}.error{color:var(--danger);font-size:13px}.empty{background:#fff;border:1px solid var(--line);padding:36px;text-align:center;border-radius:6px;color:var(--muted)}[hidden]{display:none!important}@media(max-width:680px){.item{grid-template-columns:1fr}.actions{justify-content:space-between}.topin{align-items:flex-start}.toolbar{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header class="top"><div class="topin"><h1>Ambar | Painel interno</h1><button id="logout" class="btn secondary" hidden>Sair</button></div></header>
+<main class="wrap">
+  <section id="login" class="login">
+    <h2>Acesso restrito</h2>
+    <p>Informe o token administrativo configurado no Cloudflare.</p>
+    <form id="login-form">
+      <div class="field"><label for="token">Token de acesso</label><input id="token" type="password" autocomplete="current-password" required></div>
+      <button class="btn" type="submit">Entrar</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+  <section id="dashboard" hidden>
+    <div class="toolbar"><div><h2 style="margin:0 0 4px;font-size:20px">Pedidos recebidos</h2><span id="updated" class="muted"></span></div><button id="refresh" class="btn secondary">Atualizar</button></div>
+    <div id="error" class="error" role="alert"></div>
+    <div id="list" class="list"></div>
+  </section>
+</main>
+<script>
+const $=selector=>document.querySelector(selector);
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+let token=sessionStorage.getItem('ambar_admin_token')||'';
+
+async function api(options={}){
+  const response=await fetch('/api/admin/help',{...options,headers:{'Content-Type':'application/json','Authorization':'Bearer '+token,...options.headers}});
+  if(response.status===401)throw new Error('unauthorized');
+  if(!response.ok)throw new Error('request');
+  return response.json();
+}
+
+function statusLabel(status){return ({novo:'Novo',em_atendimento:'Em atendimento',encerrado:'Encerrado'})[status]||status}
+function showDashboard(){ $('#login').hidden=true;$('#dashboard').hidden=false;$('#logout').hidden=false }
+function showLogin(){ $('#login').hidden=false;$('#dashboard').hidden=true;$('#logout').hidden=true }
+
+function render(items){
+  const list=$('#list');
+  if(!items.length){list.innerHTML='<div class="empty">Nenhum pedido recebido.</div>';return}
+  list.innerHTML=items.map(item=>{
+    const map=`https://www.openstreetmap.org/?mlat=${encodeURIComponent(item.latitude)}&mlon=${encodeURIComponent(item.longitude)}#map=17/${encodeURIComponent(item.latitude)}/${encodeURIComponent(item.longitude)}`;
+    const css=item.status==='em_atendimento'?'attending':item.status==='encerrado'?'closed':'';
+    return `<article class="item ${css}"><div><h2>${statusLabel(item.status)}</h2><p>${escapeHtml(item.message)}</p><div class="meta"><span>${new Date(item.created_at+'Z').toLocaleString('pt-BR')}</span><span>Precisão aproximada: ${Math.round(item.accuracy)} m</span><a class="map" href="${map}" target="_blank" rel="noopener noreferrer">Abrir mapa</a></div></div><div class="actions"><label class="muted" for="status-${item.id}">Status</label><select id="status-${item.id}" data-id="${item.id}"><option value="novo" ${item.status==='novo'?'selected':''}>Novo</option><option value="em_atendimento" ${item.status==='em_atendimento'?'selected':''}>Em atendimento</option><option value="encerrado" ${item.status==='encerrado'?'selected':''}>Encerrado</option></select></div></article>`
+  }).join('');
+  list.querySelectorAll('select').forEach(select=>select.addEventListener('change',()=>updateStatus(select.dataset.id,select.value)));
+}
+
+async function load(){
+  $('#error').textContent='';
+  try{const data=await api();render(data.requests);$('#updated').textContent='Atualizado em '+new Date().toLocaleTimeString('pt-BR')}
+  catch(error){if(error.message==='unauthorized'){logout();$('#login-error').textContent='Token inválido.'}else $('#error').textContent='Não foi possível carregar os pedidos.'}
+}
+
+async function updateStatus(id,status){
+  try{await api({method:'PATCH',body:JSON.stringify({id,status})});await load()}
+  catch{$('#error').textContent='Não foi possível atualizar o chamado.';await load()}
+}
+
+function logout(){token='';sessionStorage.removeItem('ambar_admin_token');showLogin()}
+$('#login-form').addEventListener('submit',async event=>{event.preventDefault();token=$('#token').value;sessionStorage.setItem('ambar_admin_token',token);showDashboard();await load()});
+$('#refresh').addEventListener('click',load);
+$('#logout').addEventListener('click',logout);
+if(token){showDashboard();load()}else showLogin();
+</script>
+</body>
+</html>
