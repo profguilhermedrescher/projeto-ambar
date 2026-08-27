@@ -1,3 +1,8 @@
 name = "projeto-ambar"
 pages_build_output_dir = "public"
 compatibility_date = "2026-08-27"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "projeto-ambar-ajuda"
+database_id = "81be467a-f660-42d9-a2ec-69ee9cdd56ba"
